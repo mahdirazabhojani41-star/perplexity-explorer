@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8ff">
+  <title>Perplexity Explorer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182238;
+      --muted: #68738a;
+      --line: #e4e9f2;
+      --blue: #3568e8;
+      --purple: #7651d6;
+      --soft-blue: #eef3ff;
+      --soft-purple: #f3efff;
+      --green: #16805a;
+      --red: #b4233a;
+      --shadow: 0 14px 36px rgba(33, 49, 89, .07);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #f6f8ff 0, #fbfcff 380px, #f7f9fc 100%);
+      color: var(--ink);
+      font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: wait; opacity: .65; }
+
+    .page { width: min(1060px, calc(100% - 36px)); margin: 0 auto; padding: 46px 0 72px; }
+    .hero { margin-bottom: 26px; }
+    .eyebrow { color: var(--blue); font-size: .76rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    h1 { margin: 7px 0 7px; font-size: clamp(2rem, 5vw, 3.1rem); line-height: 1.08; letter-spacing: -.045em; }
+    .hero p { max-width: 680px; margin: 0; color: var(--muted); font-size: 1.02rem; }
+
+    .card {
+      margin-top: 20px;
+      padding: clamp(20px, 3.5vw, 30px);
+      border: 1px solid rgba(220, 227, 239, .9);
+      border-radius: 20px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .section-heading { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
+    .section-number {
+      display: grid; flex: 0 0 36px; height: 36px; place-items: center;
+      border-radius: 12px; color: #fff; font-weight: 800;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+    }
+    h2 { margin: 0; font-size: 1.22rem; letter-spacing: -.02em; line-height: 1.35; }
+    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: .93rem; }
+    label { display: block; margin-bottom: 8px; font-size: .9rem; font-weight: 700; }
+    textarea, input[type="text"], input[type="number"] {
+      width: 100%; border: 1px solid #d8dfeb; border-radius: 12px; background: #fff;
+      color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s;
+    }
+    textarea { min-height: 104px; padding: 13px 15px; resize: vertical; }
+    input[type="text"], input[type="number"] { min-height: 42px; padding: 9px 11px; }
+    textarea:focus, input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(53, 104, 232, .13); }
+
+    .sample-row, .action-row, .preset-row { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+    .sample-row { margin: 12px 0 16px; }
+    .button {
+      display: inline-flex; justify-content: center; align-items: center; gap: 8px;
+      min-height: 42px; padding: 9px 15px; border: 1px solid transparent; border-radius: 11px;
+      font-weight: 750; transition: transform .15s, filter .15s, border-color .15s;
+    }
+    .button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(.98); }
+    .button-primary { color: #fff; background: linear-gradient(110deg, var(--blue), var(--purple)); box-shadow: 0 6px 14px rgba(81, 93, 217, .19); }
+    .button-soft { color: #3856a7; background: var(--soft-blue); border-color: #dce6ff; }
+    .button-outline { color: #564391; background: #fff; border-color: #ded7f4; }
+    .button-small { min-height: 34px; padding: 6px 11px; border-radius: 9px; font-size: .88rem; }
+
+    .status-wrap { display: flex; align-items: center; gap: 9px; min-height: 28px; margin-top: 12px; color: var(--muted); font-size: .91rem; }
+    .status-dot { width: 9px; height: 9px; border-radius: 50%; background: #aab4c7; }
+    .status-dot.ready { background: var(--green); }
+    .status-dot.loading { background: #d78d20; animation: pulse 1.1s infinite; }
+    @keyframes pulse { 50% { opacity: .35; } }
+    .error-message { display: none; margin-top: 10px; padding: 11px 13px; border: 1px solid #f1c6ce; border-radius: 10px; background: #fff3f5; color: var(--red); font-size: .92rem; }
+    .error-message.visible { display: block; }
+
+    .results { display: none; margin-top: 24px; }
+    .results.visible { display: block; }
+    .subheading { margin: 23px 0 10px; font-size: 1rem; font-weight: 800; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; }
+    table { width: 100%; min-width: 560px; border-collapse: collapse; text-align: left; }
+    th, td { padding: 10px 13px; border-bottom: 1px solid #edf0f5; }
+    th { background: #f7f9fd; color: #56627a; font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
+    td { font-size: .91rem; }
+    tbody tr:last-child td { border-bottom: 0; }
+    td:first-child { width: 56px; color: #8791a4; font-variant-numeric: tabular-nums; }
+    .token-cell { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; }
+    .number-cell { font-variant-numeric: tabular-nums; }
+    .steps { display: grid; gap: 9px; margin-top: 13px; }
+    .step { padding: 13px 15px; border: 1px solid var(--line); border-radius: 12px; background: #fbfcff; }
+    .step-label { display: block; margin-bottom: 4px; color: var(--muted); font-size: .79rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .formula { overflow-wrap: anywhere; color: #35415a; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .9rem; }
+    .perplexity-value { display: block; color: var(--purple); font-size: clamp(1.8rem, 5vw, 2.45rem); font-weight: 850; letter-spacing: -.05em; line-height: 1.15; }
+    .prediction-list { display: grid; gap: 10px; }
+    .prediction { display: grid; grid-template-columns: minmax(80px, 150px) 1fr minmax(72px, auto); gap: 12px; align-items: center; }
+    .prediction-token { overflow: hidden; padding: 5px 8px; border: 1px solid #e3e8f1; border-radius: 8px; background: #f8f9fc; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-overflow: ellipsis; white-space: pre; }
+    .prediction-bar { height: 12px; overflow: hidden; border-radius: 999px; background: #edf0f7; }
+    .prediction-fill { height: 100%; min-width: 1px; border-radius: inherit; background: linear-gradient(90deg, #7497fa, #9a7be8); }
+    .prediction.top .prediction-token { border-color: #c9d5ff; color: #244fc3; background: #eef3ff; font-weight: 800; }
+    .prediction.top .prediction-fill { background: linear-gradient(90deg, var(--blue), var(--purple)); }
+    .prediction-percent { color: #58647b; font-size: .87rem; font-variant-numeric: tabular-nums; text-align: right; }
+    .next-label { color: var(--muted); font-size: .87rem; }
+
+    .sim-label { display: inline-block; margin-left: 7px; padding: 4px 8px; border-radius: 999px; color: #6746b7; background: var(--soft-purple); font-size: .72rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; vertical-align: 2px; }
+    .sim-help { margin: -8px 0 16px; color: var(--muted); font-size: .9rem; }
+    .preset-row { margin: 14px 0 18px; }
+    .manual-list { display: grid; gap: 9px; }
+    .manual-row { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 180px) auto; gap: 9px; align-items: end; }
+    .manual-row label { margin-bottom: 5px; color: #59647a; font-size: .78rem; }
+    .remove-button { min-height: 42px; padding: 8px 12px; border: 1px solid #ecd0d5; border-radius: 10px; color: #a43349; background: #fff8f9; font-weight: 700; }
+    .sim-summary { margin-top: 18px; }
+    .empty-note { padding: 16px; border: 1px dashed #d6deeb; border-radius: 12px; color: var(--muted); text-align: center; }
+    footer { margin-top: 24px; color: #78839a; font-size: .82rem; text-align: center; }
+
+    @media (max-width: 600px) {
+      .page { width: min(100% - 24px, 1060px); padding-top: 30px; }
+      .card { border-radius: 16px; }
+      .prediction { grid-template-columns: minmax(70px, 108px) 1fr 68px; gap: 8px; }
+      .manual-row { grid-template-columns: 1fr 1fr auto; }
+      .remove-button { padding-inline: 9px; }
+      .button { padding-inline: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <div class="eyebrow">A tiny language model lab</div>
+      <h1>Perplexity Explorer</h1>
+      <p>See how a language model scores each token, then explore what perplexity means with a hands-on calculator.</p>
+    </header>
+
+    <section class="card" aria-labelledby="input-title">
+      <div class="section-heading">
+        <div class="section-number" aria-hidden="true">1</div>
+        <div>
+          <h2 id="input-title">Type a sentence</h2>
+          <p>The model downloads into your browser the first time you calculate.</p>
+        </div>
+      </div>
+      <label for="sentence">Your sentence</label>
+      <textarea id="sentence" spellcheck="false">I love Python</textarea>
+      <div class="sample-row" aria-label="Sample sentences">
+        <button class="button button-soft sample-button" type="button" data-sentence="I love Python">I love Python</button>
+        <button class="button button-soft sample-button" type="button" data-sentence="Python love I">Python love I</button>
+        <button class="button button-soft sample-button" type="button" data-sentence="The capital of France is Paris">The capital of France is Paris</button>
+      </div>
+      <div class="action-row">
+        <button class="button button-primary" id="calculate-button" type="button">Calculate perplexity</button>
+      </div>
+      <div class="status-wrap" role="status" aria-live="polite">
+        <span class="status-dot" id="status-dot" aria-hidden="true"></span>
+        <span id="model-status">Model not downloaded yet</span>
+      </div>
+      <div class="error-message" id="model-error" role="alert"></div>
+
+      <div class="results" id="model-results">
+        <div class="subheading">Section 2 · Probability of each token → perplexity</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Token</th><th>Probability P</th><th>1 / P</th></tr></thead>
+            <tbody id="token-rows"></tbody>
+          </table>
+        </div>
+        <div class="steps" id="model-steps"></div>
+
+        <div class="subheading">Section 3 · What does the model predict next?</div>
+        <p class="next-label">The eight most likely next tokens after your sentence:</p>
+        <div class="prediction-list" id="predictions"></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="manual-title">
+      <div class="section-heading">
+        <div class="section-number" aria-hidden="true">4</div>
+        <div>
+          <h2 id="manual-title">Try it by hand <span class="sim-label">Simulated, not from the model</span></h2>
+          <p>Enter token probabilities to see how their geometric mean becomes perplexity.</p>
+        </div>
+      </div>
+      <p class="sim-help">Each probability must be greater than 0 and at most 1. These examples are made up for practice.</p>
+      <div class="preset-row" aria-label="Example probability presets">
+        <button class="button button-outline button-small preset-button" type="button" data-preset="love">I love Python</button>
+        <button class="button button-outline button-small preset-button" type="button" data-preset="eighths">All 1/8</button>
+        <button class="button button-outline button-small preset-button" type="button" data-preset="surprise">One surprising word</button>
+      </div>
+      <div class="manual-list" id="manual-rows"></div>
+      <div class="action-row" style="margin-top: 12px">
+        <button class="button button-soft button-small" id="add-token" type="button">+ Add token</button>
+      </div>
+      <div class="error-message" id="sim-error" role="alert"></div>
+      <div class="sim-summary" id="sim-summary"></div>
+    </section>
+
+    <footer>Perplexity is the exponential of the average negative log probability.</footer>
+  </main>
+
+  <script type="module">
+    import { AutoTokenizer, AutoModelForCausalLM, Tensor } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";
+
+    const MODEL_ID = "Xenova/distilgpt2";
+    const START_TOKEN_ID = 50256;
+    const sentenceInput = document.querySelector("#sentence");
+    const calculateButton = document.querySelector("#calculate-button");
+    const statusText = document.querySelector("#model-status");
+    const statusDot = document.querySelector("#status-dot");
+    const modelError = document.querySelector("#model-error");
+    const modelResults = document.querySelector("#model-results");
+    const sampleButtons = [...document.querySelectorAll(".sample-button")];
+
+    let tokenizer = null;
+    let model = null;
+    let modelLoadPromise = null;
+
+    // Read the model and tokenizer only after the first button click.
+    async function loadModel() {
+      if (model && tokenizer) return;
+      if (!modelLoadPromise) {
+        modelLoadPromise = Promise.all([
+          AutoTokenizer.from_pretrained(MODEL_ID),
+          AutoModelForCausalLM.from_pretrained(MODEL_ID, { dtype: "q8" })
+        ]).then(([loadedTokenizer, loadedModel]) => {
+          tokenizer = loadedTokenizer;
+          model = loadedModel;
+        }).catch((error) => {
+          modelLoadPromise = null;
+          throw error;
+        });
+      }
+      await modelLoadPromise;
+    }
+
+    function setStatus(message, state = "") {
+      statusText.textContent = message;
+      statusDot.className = `status-dot ${state}`;
+    }
+
+    function showError(element, message) {
+      element.textContent = message;
+      element.classList.add("visible");
+    }
+
+    function clearError(element) {
+      element.textContent = "";
+      element.classList.remove("visible");
+    }
+
+    function formatLogValue(logValue) {
+      if (logValue === 0) return "1";
+      const powerOfTen = logValue / Math.LN10;
+      if (powerOfTen >= -3 && powerOfTen < 6) {
+        return Math.exp(logValue).toPrecision(5).replace(/\.?0+$/, "");
+      }
+      const exponent = Math.floor(powerOfTen);
+      const leading = Math.pow(10, powerOfTen - exponent);
+      return `${leading.toPrecision(4)}e${exponent}`;
+    }
+
+    function formatProbability(logProbability) {
+      return formatLogValue(logProbability);
+    }
+
+    function formatToken(text) {
+      // Make leading spaces visible in token labels.
+      return text.replaceAll(" ", "␣");
+    }
+
+    function softmaxLogProbability(logits, offset, vocabularySize, targetId) {
+      let maxLogit = -Infinity;
+      for (let i = 0; i < vocabularySize; i++) {
+        if (logits[offset + i] > maxLogit) maxLogit = logits[offset + i];
+      }
+
+      let expTotal = 0;
+      for (let i = 0; i < vocabularySize; i++) {
+        expTotal += Math.exp(logits[offset + i] - maxLogit);
+      }
+
+      // Keep the log probability so very small values do not round to zero.
+      return logits[offset + targetId] - maxLogit - Math.log(expTotal);
+    }
+
+    function createCell(row, value, className = "") {
+      const cell = document.createElement("td");
+      if (className) cell.className = className;
+      cell.textContent = value;
+      row.append(cell);
+      return cell;
+    }
+
+    function productLabel(logReciprocalSum) {
+      const factors = currentFactors.map((factor) => `(${factor})`).join(" × ");
+      const product = formatLogValue(logReciprocalSum);
+      return factors ? `${factors} = ${product}` : "No factors yet";
+    }
+
+    let currentFactors = [];
+
+    function renderSteps(container, logProbabilities) {
+      const count = logProbabilities.length;
+      const logReciprocalSum = logProbabilities.reduce((total, value) => total - value, 0);
+      const factorValues = logProbabilities.map((value) => formatLogValue(-value));
+      currentFactors = factorValues;
+      container.replaceChildren();
+
+      const stepOne = document.createElement("div");
+      stepOne.className = "step";
+      stepOne.innerHTML = '<span class="step-label">Step 1 · Multiply all the 1 / P values</span>';
+      const formula = document.createElement("div");
+      formula.className = "formula";
+      formula.textContent = productLabel(logReciprocalSum);
+      stepOne.append(formula);
+
+      const stepTwo = document.createElement("div");
+      stepTwo.className = "step";
+      stepTwo.innerHTML = '<span class="step-label">Step 2 · Count the tokens</span>';
+      const countText = document.createElement("div");
+      countText.className = "formula";
+      countText.textContent = `N = ${count}`;
+      stepTwo.append(countText);
+
+      const stepThree = document.createElement("div");
+      stepThree.className = "step";
+      stepThree.innerHTML = '<span class="step-label">Step 3 · Take the Nth root</span>';
+      const value = document.createElement("span");
+      value.className = "perplexity-value";
+      const perplexity = count ? Math.exp(logReciprocalSum / count) : NaN;
+      value.textContent = count ? perplexity.toFixed(2) : "—";
+      const formulaThree = document.createElement("div");
+      formulaThree.className = "formula";
+      formulaThree.textContent = count
+        ? `Perplexity = (${formatLogValue(logReciprocalSum)})^(1 / ${count}) = ${perplexity.toFixed(2)}`
+        : "Add at least one token to calculate perplexity.";
+      stepThree.append(value, formulaThree);
+      container.append(stepOne, stepTwo, stepThree);
+    }
+
+    function renderModelResults(tokenIds, tokenLogProbabilities, predictions) {
+      const rows = document.querySelector("#token-rows");
+      rows.replaceChildren();
+      tokenIds.forEach((id, index) => {
+        const row = document.createElement("tr");
+        createCell(row, String(index + 1));
+        createCell(row, formatToken(tokenizer.decode([id])), "token-cell");
+        createCell(row, formatProbability(tokenLogProbabilities[index]), "number-cell");
+        createCell(row, formatLogValue(-tokenLogProbabilities[index]), "number-cell");
+        rows.append(row);
+      });
+      renderSteps(document.querySelector("#model-steps"), tokenLogProbabilities);
+
+      const predictionList = document.querySelector("#predictions");
+      predictionList.replaceChildren();
+      const maxProbability = predictions[0]?.probability || 1;
+      predictions.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = `prediction${index === 0 ? " top" : ""}`;
+        const token = document.createElement("span");
+        token.className = "prediction-token";
+        token.textContent = formatToken(tokenizer.decode([item.id]));
+        token.title = token.textContent;
+        const bar = document.createElement("div");
+        bar.className = "prediction-bar";
+        const fill = document.createElement("div");
+        fill.className = "prediction-fill";
+        fill.style.width = `${Math.max(.5, item.probability / maxProbability * 100)}%`;
+        bar.append(fill);
+        const percent = document.createElement("span");
+        percent.className = "prediction-percent";
+        percent.textContent = `${(item.probability * 100).toFixed(2)}%`;
+        row.append(token, bar, percent);
+        predictionList.append(row);
+      });
+      modelResults.classList.add("visible");
+    }
+
+    function topNextTokens(logits, offset, vocabularySize) {
+      let maxLogit = -Infinity;
+      for (let i = 0; i < vocabularySize; i++) {
+        maxLogit = Math.max(maxLogit, logits[offset + i]);
+      }
+      let expTotal = 0;
+      for (let i = 0; i < vocabularySize; i++) {
+        expTotal += Math.exp(logits[offset + i] - maxLogit);
+      }
+
+      const top = [];
+      for (let id = 0; id < vocabularySize; id++) {
+        const probability = Math.exp(logits[offset + id] - maxLogit) / expTotal;
+        if (top.length < 8 || probability > top[top.length - 1].probability) {
+          top.push({ id, probability });
+          top.sort((a, b) => b.probability - a.probability);
+          if (top.length > 8) top.pop();
+        }
+      }
+      return top;
+    }
+
+    async function calculateModelPerplexity() {
+      clearError(modelError);
+      modelResults.classList.remove("visible");
+      const sentence = sentenceInput.value.trim();
+      if (!sentence) {
+        showError(modelError, "Type a sentence first so the model has tokens to score.");
+        return;
+      }
+
+      calculateButton.disabled = true;
+      sampleButtons.forEach((button) => { button.disabled = true; });
+      try {
+        if (!model || !tokenizer) {
+          setStatus("Downloading the model…", "loading");
+          await loadModel();
+        }
+        setStatus("Model ready", "ready");
+
+        // Put the start marker before the sentence so its first token gets scored.
+        const sentenceIds = tokenizer.encode(sentence, { add_special_tokens: false });
+        if (sentenceIds.length === 0) throw new Error("This sentence did not produce any tokens. Try another sentence.");
+        const tokenIds = [START_TOKEN_ID, ...sentenceIds];
+        if (tokenIds.length > 1024) throw new Error("This model supports up to 1,023 sentence tokens at a time.");
+        const inputTensor = new Tensor("int64", BigInt64Array.from(tokenIds, (id) => BigInt(id)), [1, tokenIds.length]);
+
+        // One model call returns a vocabulary score at each token position.
+        const output = await model({ input_ids: inputTensor });
+        const logitsTensor = output.logits;
+        const [batchSize, sequenceLength, vocabularySize] = logitsTensor.dims;
+        if (batchSize !== 1 || sequenceLength !== tokenIds.length) {
+          throw new Error("The model returned an unexpected logits shape.");
+        }
+        const logits = logitsTensor.data;
+        const tokenLogProbabilities = [];
+        for (let i = 1; i < tokenIds.length; i++) {
+          // The token at i is predicted by the logits at the position before it.
+          tokenLogProbabilities.push(softmaxLogProbability(logits, (i - 1) * vocabularySize, vocabularySize, tokenIds[i]));
+        }
+        const predictions = topNextTokens(logits, (sequenceLength - 1) * vocabularySize, vocabularySize);
+        renderModelResults(tokenIds.slice(1), tokenLogProbabilities, predictions);
+        setStatus("Model ready", "ready");
+      } catch (error) {
+        setStatus("Model unavailable", "");
+        showError(modelError, `Could not calculate with Xenova/distilgpt2. Check your connection and try again. Details: ${error.message || error}`);
+      } finally {
+        calculateButton.disabled = false;
+        sampleButtons.forEach((button) => { button.disabled = false; });
+      }
+    }
+
+    calculateButton.addEventListener("click", calculateModelPerplexity);
+    sampleButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        sentenceInput.value = button.dataset.sentence;
+        calculateModelPerplexity();
+      });
+    });
+
+    const manualRows = document.querySelector("#manual-rows");
+    const simSummary = document.querySelector("#sim-summary");
+    const simError = document.querySelector("#sim-error");
+
+    function addManualRow(name = "Token", probability = "0.5") {
+      const row = document.createElement("div");
+      row.className = "manual-row";
+      const nameField = document.createElement("div");
+      const nameId = `token-name-${crypto.randomUUID()}`;
+      const nameLabel = document.createElement("label");
+      nameLabel.htmlFor = nameId;
+      nameLabel.textContent = "Token name";
+      const nameInput = document.createElement("input");
+      nameInput.id = nameId;
+      nameInput.type = "text";
+      nameInput.value = name;
+      nameInput.setAttribute("aria-label", "Token name");
+      nameField.append(nameLabel, nameInput);
+
+      const probabilityField = document.createElement("div");
+      const probabilityId = `token-probability-${crypto.randomUUID()}`;
+      const probabilityLabel = document.createElement("label");
+      probabilityLabel.htmlFor = probabilityId;
+      probabilityLabel.textContent = "Probability P";
+      const probabilityInput = document.createElement("input");
+      probabilityInput.id = probabilityId;
+      probabilityInput.type = "number";
+      probabilityInput.min = "0";
+      probabilityInput.max = "1";
+      probabilityInput.step = "any";
+      probabilityInput.value = probability;
+      probabilityInput.setAttribute("aria-label", "Token probability");
+      probabilityField.append(probabilityLabel, probabilityInput);
+
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "remove-button";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", () => {
+        row.remove();
+        updateManualCalculation();
+      });
+      nameInput.addEventListener("input", updateManualCalculation);
+      probabilityInput.addEventListener("input", updateManualCalculation);
+      row.append(nameField, probabilityField, removeButton);
+      manualRows.append(row);
+    }
+
+    function renderManualTable(entries) {
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "table-wrap";
+      const table = document.createElement("table");
+      table.innerHTML = '<thead><tr><th>#</th><th>Token</th><th>Probability P</th><th>1 / P</th></tr></thead>';
+      const body = document.createElement("tbody");
+      entries.forEach((entry, index) => {
+        const row = document.createElement("tr");
+        createCell(row, String(index + 1));
+        createCell(row, entry.name || `Token ${index + 1}`, "token-cell");
+        createCell(row, formatProbability(entry.logProbability), "number-cell");
+        createCell(row, formatLogValue(-entry.logProbability), "number-cell");
+        body.append(row);
+      });
+      table.append(body);
+      tableWrap.append(table);
+      return tableWrap;
+    }
+
+    function updateManualCalculation() {
+      clearError(simError);
+      const inputs = [...manualRows.querySelectorAll(".manual-row")];
+      const entries = [];
+      for (const row of inputs) {
+        const name = row.querySelector('input[type="text"]').value.trim();
+        const rawProbability = row.querySelector('input[type="number"]').value;
+        const probability = Number(rawProbability);
+        if (rawProbability === "" || !Number.isFinite(probability) || probability <= 0 || probability > 1) {
+          simSummary.replaceChildren();
+          showError(simError, "Enter a probability greater than 0 and at most 1 for every token.");
+          return;
+        }
+        entries.push({ name, logProbability: Math.log(probability) });
+      }
+
+      simSummary.replaceChildren();
+      simSummary.append(renderManualTable(entries));
+      const steps = document.createElement("div");
+      steps.className = "steps";
+      renderSteps(steps, entries.map((entry) => entry.logProbability));
+      simSummary.append(steps);
+    }
+
+    function setPreset(name) {
+      manualRows.replaceChildren();
+      let tokens;
+      if (name === "love") {
+        tokens = [["I", "0.5"], ["love", "0.8"], ["Python", "0.2"]];
+      } else if (name === "eighths") {
+        tokens = Array.from({ length: 8 }, (_, i) => [`Token ${i + 1}`, "0.125"]);
+      } else {
+        tokens = [["word 1", "0.9"], ["word 2", "0.9"], ["word 3", "0.9"], ["surprise", "0.01"]];
+      }
+      tokens.forEach(([label, probability]) => addManualRow(label, probability));
+      updateManualCalculation();
+    }
+
+    document.querySelector("#add-token").addEventListener("click", () => {
+      addManualRow(`Token ${manualRows.children.length + 1}`, "0.5");
+      updateManualCalculation();
+    });
+    document.querySelectorAll(".preset-button").forEach((button) => {
+      button.addEventListener("click", () => setPreset(button.dataset.preset));
+    });
+
+    // Start with the three-token example and keep its answer visible.
+    setPreset("love");
+  </script>
+</body>
+</html>
